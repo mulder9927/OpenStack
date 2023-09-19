@@ -1,0 +1,32 @@
+network:
+    version: 2
+    renderer: networkd
+    bonds:
+        bond0:
+            dhcp4: no
+            interfaces: [%NETWORK1%, %NETWORK2%]
+            parameters:
+                mode: active-backup
+                primary: %NETWORK1%
+                mii-monitor-interval: 100
+    ethernets:
+        %NETWORK1%: {}
+        %NETWORK2%: {}
+    vlans:
+        bond0.6:
+            dhcp4: no
+            addresses: [%PXE-SUBNET%/24]
+            gateway4: %NETWORK-GATEWAY%
+            id: 6 # PXE vlan
+            link: bond0
+            nameservers:
+                addresses: [%PXE-SUBNET%, 8.8.8.8]
+        bond0.7:
+            id: 7 #Undercloud vlan
+            link: bond0
+        bond0.8:
+            id: 8 #Production vlan (EXT network)
+            link: bond0
+        bond0.12:
+            id: 12 #Management vlan (OOB)
+            link: bond0

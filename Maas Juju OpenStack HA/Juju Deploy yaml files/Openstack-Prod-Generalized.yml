@@ -1,0 +1,792 @@
+# Please refer to the OpenStack Charms Deployment Guide for more information.
+# https://docs.openstack.org/project-deploy-guide/charm-deployment-guide
+
+series: focal
+variables:
+  openstack-origin: &openstack-origin cloud:focal-yoga
+  data-port: &data-port br-ex:bond0
+  worker-multiplier: &worker-multiplier 0.25
+  osd-devices: &osd-devices /dev/sdb /dev/sdc /dev/sdd #/dev/sde /dev/sdf /dev/sdg /dev/sdh <Configured for Dual pool 
+  expected-osd-count: &expected-osd-count 3
+  expected-mon-count: &expected-mon-count 3
+  #spaces: internal
+
+#configured segregated deployment for specific hw architecture. 
+machines:
+  '0':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '1':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '2':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '3':
+    series: focal
+    constraints: tags=Controller-Prod
+  '4':
+    series: focal
+    constraints: tags=Controller-Prod
+  '5':
+    series: focal
+    constraints: tags=Controller-Prod
+  '6':
+    series: focal
+    constraints: tags=Compute-Prod
+  '7':
+    series: focal
+    constraints: tags=Compute-Prod
+  '8':
+    series: focal
+    constraints: tags=Compute-Prod
+  '9':
+    series: focal
+    constraints: tags=Compute-Prod
+
+
+applications:
+
+ 
+  memcached:
+    charm: ch:memcached
+    num_units: 2
+    channel: latest/stable
+    # bindings:      "": internal
+    to:
+     - lxd:3
+     - lxd:4
+
+   ceph-dashboard:
+     charm: ch:ceph-dashboard
+     channel: quincy/stable
+     # bindings:      "": internal
+     ##revision: 3
+
+   openstack-loadbalancer:
+     charm: ch:openstack-charmers-openstack-loadbalancer <throwing error while deploying 8-12-23
+     # channel: latest/stable
+     #revision: 0
+     num_units: 3
+     # bindings:      "": internal
+     to:
+      - lxd:3
+      - lxd:4
+      - lxd:5
+     options:
+       vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+
+   openstack-loadbalancer-hacluster: <throwing error while deploying 8-12-23
+     charm: ch:hacluster
+     channel: 2.4/stable
+     #revision: 83
+     # bindings:      "": internal
+
+
+  ceph-mon:
+    annotations:
+      gui-x: '790'
+      gui-y: '1540'
+    charm: ch:ceph-mon
+    channel: quincy/stable
+    #revision: 73
+    num_units: 3
+    options:
+      expected-osd-count: *expected-osd-count
+      monitor-count: *expected-mon-count
+      source: *openstack-origin
+    # bindings:
+    #   public:    #   "": internal
+    to:
+     - lxd:0
+     - lxd:1
+     - lxd:2
+
+  ceph-osd:
+    annotations:
+      gui-x: '1065'
+      gui-y: '1540'
+    charm: ch:ceph-osd
+    channel: quincy/stable
+    #revision: 513
+    num_units: 3
+    # # bindings:    #   "": internal
+    options:
+      osd-devices: *osd-devices
+      source: *openstack-origin
+    to:
+     - '0'
+     - '1'
+     - '2'
+
+  ceph-radosgw-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 975.2022857666016
+      gui-y: 861.4601440429688
+
+  ceph-radosgw:
+    annotations:
+      gui-x: '850'
+      gui-y: '900'
+    charm: ch:ceph-radosgw
+    channel: quincy/stable
+    #revision: 499
+    num_units: 3
+    options:
+      os-admin-hostname: ceph.prod
+      os-internal-hostname: ceph.prod
+      os-public-hostname: ceph.prod
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+      source: *openstack-origin
+    # # bindings:    #   "": internal
+    to:
+     - lxd:0
+     - lxd:1
+     - lxd:2
+
+  cinder-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 1097.0257568359375
+      gui-y: 1207.35888671875
+
+  cinder-mysql-router:
+    annotations:
+      gui-x: '900'
+      gui-y: '1400'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  cinder:
+    annotations:
+      gui-x: '980'
+      gui-y: '1270'
+    charm: ch:cinder
+    channel: yoga/stable
+    #revision: 530
+    num_units: 3
+    options:
+      os-admin-hostname: cinder.prod
+      os-internal-hostname: cinder.prod
+      os-public-hostname: cinder.prod
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+      block-device: None
+      glance-api-version: 2
+      worker-multiplier: *worker-multiplier
+      openstack-origin: *openstack-origin
+    # bindings:      "": internal
+    to:
+     - lxd:0
+     - lxd:1
+     - lxd:2
+
+  cinder-ceph:
+    annotations:
+      gui-x: '1120'
+      gui-y: '1400'
+    charm: ch:cinder-ceph
+    channel: yoga/stable
+    num_units: 0
+    #revision: 483
+    # bindings:      "": internal
+
+  glance-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    annotations:
+      gui-x: -134.58247900009155
+      gui-y: 1207.35888671875
+    # bindings:      "": internal
+
+  glance-mysql-router:
+    annotations:
+      gui-x: '-290'
+      gui-y: '1400'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  glance:
+    annotations:
+      gui-x: '-230'
+      gui-y: '1270'
+    charm: ch:glance
+    channel: yoga/stable
+    #revision: 516
+    num_units: 3
+    options:
+      os-admin-hostname: glance.prod
+      os-internal-hostname: glance.prod
+      os-public-hostname: glance.prod
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+      worker-multiplier: *worker-multiplier
+      openstack-origin: *openstack-origin
+    # bindings:      "": internal
+    to:
+     - lxd:3
+     - lxd:4
+     - lxd:5
+
+  glance-simplestreams-sync:
+    charm: glance-simplestreams-sync
+    channel: yoga/stable
+    #revision: 47
+    num_units: 1
+    # bindings:      "": internal
+    options:
+      run: true
+    to:
+     - lxd:5
+
+  keystone-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 416.79443359375
+      gui-y: 1231.331787109375
+
+  keystone-mysql-router:
+    annotations:
+      gui-x: '230'
+      gui-y: '1400'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  keystone:
+    annotations:
+      gui-x: '300'
+      gui-y: '1270'
+    charm: ch:keystone
+    channel: yoga/stable
+    #revision: 539
+    num_units: 3
+    options:
+      os-admin-hostname: keystone.prod
+      os-internal-hostname: keystone.prod
+      os-public-hostname: keystone.prod
+      worker-multiplier: *worker-multiplier
+      openstack-origin: *openstack-origin
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+    # bindings:      "": internal
+    to:
+     - lxd:3
+     - lxd:4
+     - lxd:5
+
+  masakari:
+    charm: ch:masakari
+    channel: yoga/stable
+    #revision: 17
+    num_units: 3
+    # bindings:      "": internal
+    to:
+     - lxd:3
+     - lxd:4
+     - lxd:5
+    options:
+      os-admin-hostname: masakari.prod
+      os-admin-hostname: masakari.prod
+      os-public-hostname: masakari.prod
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+
+  pacemaker-remote:
+    charm: ch:pacemaker-remote
+    channel: latest/stable
+    options:
+      enable-stonith: True
+      enable-resources: False
+
+  masakari-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+
+  masakari-monitors:
+    charm: ch:masakari-monitors
+    channel: yoga/stable
+    # bindings:      "": internal
+    #revision: 14
+
+  masakari-mysql-router:
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  neutron-mysql-router:
+    annotations:
+      gui-x: '505'
+      gui-y: '1385'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  neutron-api-plugin-ovn:
+    annotations:
+      gui-x: '690'
+      gui-y: '1385'
+    charm: ch:neutron-api-plugin-ovn
+    channel: yoga/stable
+    #revision: 10
+    # bindings:      "": internal
+
+  neutron-api-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 689.4863891601562
+      gui-y: 1237.3250732421875
+
+  neutron-api:
+    annotations:
+      gui-x: '580'
+      gui-y: '1270'
+    charm: ch:neutron-api
+    channel: yoga/stable
+    #revision: 501
+    num_units: 3
+    options:
+      enable-ml2-port-security: true
+      os-admin-hostname: neutron-api.prod
+      os-internal-hostname: neutron-api.prod
+      os-public-hostname: neutron-api.prod
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+      neutron-security-groups: true
+      flat-network-providers: physnet1
+      worker-multiplier: *worker-multiplier
+      openstack-origin: *openstack-origin
+    # bindings:      "": internal
+    to:
+     - lxd:3
+     - lxd:4
+     - lxd:5
+
+  placement-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 1426.066650390625
+      gui-y: 1230.1529541015625
+
+  placement-mysql-router:
+    annotations:
+      gui-x: '1320'
+      gui-y: '1385'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  placement:
+    annotations:
+      gui-x: '1320'
+      gui-y: '1270'
+    charm: ch:placement
+    channel: yoga/stable
+    #revision: 32
+    num_units: 3
+    options:
+      os-admin-hostname: placement.prod
+      os-internal-hostname: placement.prod
+      os-public-hostname: placement.prod
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+      worker-multiplier: *worker-multiplier
+      openstack-origin: *openstack-origin
+    # bindings:      "": internal
+    to:
+     - lxd:3
+     - lxd:4
+     - lxd:5
+
+  nova-cloud-controller-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 147.09925842285156
+      gui-y: 1222.342041015625
+
+  nova-mysql-router:
+    annotations:
+      gui-x: '-30'
+      gui-y: '1385'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  nova-cloud-controller:
+    annotations:
+      gui-x: '35'
+      gui-y: '1270'
+    charm: ch:nova-cloud-controller
+    channel: yoga/stable
+    #revision: 566
+    num_units: 3
+    options:
+      console-access-protocol: spice
+      os-admin-hostname: compute.prod
+      os-internal-hostname: compute.prod
+      os-public-hostname: compute.prod
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+      network-manager: Neutron
+      worker-multiplier: *worker-multiplier
+      openstack-origin: *openstack-origin
+    # bindings:      "": internal
+    to:
+     - lxd:3
+     - lxd:4
+     - lxd:5
+
+  nova-compute:
+    annotations:
+      gui-x: '190'
+      gui-y: '890'
+    charm: ch:nova-compute
+    channel: yoga/stable
+    #revision: 550
+    num_units: 4
+    # bindings:      "": internal
+    options:
+      customize-failure-domain: true
+      libvirt-image-backend: rbd
+      rbd-pool: cinder-ceph
+      config-flags: default_ephemeral_format=ext4
+      enable-live-migration: true
+      enable-resize: true
+      migration-auth-type: ssh
+      openstack-origin: *openstack-origin
+    to:
+      - '6'
+      - '7'
+      - '8'
+      - '9'
+      # - '10'
+
+  openstack-dashboard-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 686.48974609375
+      gui-y: 856.7550659179688
+
+  openstack-dashboard-mysql-router:
+    annotations:
+      gui-x: '510'
+      gui-y: '1030'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  openstack-dashboard:
+    annotations:
+      gui-x: '585'
+      gui-y: '900'
+    charm: ch:openstack-dashboard
+    channel: yoga/stable
+    #revision: 514
+    num_units: 3
+    options:
+      default-theme: default
+      default-create-volume: false
+      enforce-ssl: true
+      os-public-hostname: openstack.prod
+      openstack-origin: *openstack-origin
+      password-retrieve: true
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+      # ubuntu-theme: no
+    # bindings:      "": internal
+    to:
+    - lxd:3
+    - lxd:4
+    - lxd:5
+
+  rabbitmq-server:
+    annotations:
+      gui-x: '300'
+      gui-y: '1550'
+    charm: ch:rabbitmq-server
+    channel: 3.9/stable
+    #revision: 123
+    num_units: 3
+    # bindings:      "": internal
+    to:
+    - lxd:3
+    - lxd:4
+    - lxd:5
+
+  mysql-innodb-cluster:
+    annotations:
+      gui-x: '535'
+      gui-y: '1550'
+    charm: ch:mysql-innodb-cluster
+    channel: 8.0/stable
+    #revision: 15
+    num_units: 3
+    # bindings:      "": internal
+    to:
+    - lxd:3
+    - lxd:4
+    - lxd:5
+
+  ovn-central:
+    annotations:
+      gui-x: '70'
+      gui-y: '1550'
+    charm: ch:ovn-central
+    channel: 22.03/stable
+    #revision: 16
+    num_units: 3
+    # bindings:      "": internal
+    options:
+      source: *openstack-origin
+    to:
+    - lxd:3
+    - lxd:4
+    - lxd:5
+
+  ovn-chassis:
+    annotations:
+      gui-x: '120'
+      gui-y: '1030'
+    charm: ch:ovn-chassis
+    channel: 22.03/stable
+    # bindings:      "": internal
+    ##revision: 21
+    # *** Please update the `bridge-interface-mappings` to values suitable ***
+    # *** for the hardware used in your deployment. See the referenced     ***
+    # *** documentation at the top of this file.                           ***
+    options:
+      ovn-bridge-mappings: physnet1:br-ex
+      bridge-interface-mappings: *data-port
+
+  vault-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: "900"
+      gui-y: "300"
+
+  vault-mysql-router:
+    annotations:
+      gui-x: '1535'
+      gui-y: '1560'
+    charm: mysql-router
+    channel: 8.0/stable
+    #revision: 15
+    # bindings:      "": internal
+
+  vault:
+    annotations:
+      gui-x: '1610'
+      gui-y: '1430'
+    charm: ch:vault
+    channel: 1.7/stable
+    #revision: 54
+    num_units: 3
+    options:
+      vip: %UndercloudIP% #Add VIP for undercloud configured in maas dns.
+    # bindings:      "": internal
+    to:
+    - lxd:3
+    - lxd:4
+    - lxd:5
+
+relations:
+#Ceph Dashboard
+ - - ceph-dashboard:dashboard
+   - ceph-mon:dashboard
+ - - ceph-dashboard:certificates
+   - vault:certificates
+ - - ceph-dashboard:loadbalancer
+   - openstack-loadbalancer:loadbalancer
+ #Masakari
+- - masakari-hacluster:ha
+  - masakari:ha
+- - masakari-mysql-router:shared-db
+  - masakari:shared-db
+- - mysql-innodb-cluster:db-router
+  - masakari-mysql-router:db-router
+- - keystone:identity-service
+  - masakari:identity-service
+- - rabbitmq-server:amqp
+  - masakari:amqp
+- - masakari-monitors:identity-credentials
+  - keystone:identity-credentials
+ - - masakari-monitors:container
+   -  nova-compute:juju-info
+- - masakari-hacluster:pacemaker-remote
+  - pacemaker-remote:pacemaker-remote
+ #Openstack-Loadbalancer
+ - - openstack-loadbalancer:ha
+   - openstack-loadbalancer-hacluster:ha
+
+
+# Openstack Core Install
+- - nova-compute:amqp
+  - rabbitmq-server:amqp
+- - nova-cloud-controller:identity-service
+  - keystone:identity-service
+- - glance:identity-service
+  - keystone:identity-service
+- - neutron-api:identity-service
+  - keystone:identity-service
+- - neutron-api:amqp
+  - rabbitmq-server:amqp
+- - glance:amqp
+  - rabbitmq-server:amqp
+- - nova-cloud-controller:image-service
+  - glance:image-service
+- - nova-compute:image-service
+  - glance:image-service
+- - nova-cloud-controller:cloud-compute
+  - nova-compute:cloud-compute
+- - nova-cloud-controller:amqp
+  - rabbitmq-server:amqp
+- - openstack-dashboard:identity-service
+  - keystone:identity-service
+- - openstack-dashboard-hacluster:ha
+  - openstack-dashboard:ha
+- - nova-cloud-controller:neutron-api
+  - neutron-api:neutron-api
+- - cinder:image-service
+  - glance:image-service
+- - cinder:amqp
+  - rabbitmq-server:amqp
+- - cinder:identity-service
+  - keystone:identity-service
+- - cinder:cinder-volume-service
+  - nova-cloud-controller:cinder-volume-service
+- - cinder-ceph:storage-backend
+  - cinder:storage-backend
+- - ceph-mon:client
+  - nova-compute:ceph
+- - nova-compute:ceph-access
+  - cinder-ceph:ceph-access
+- - ceph-mon:client
+  - cinder-ceph:ceph
+- - ceph-mon:client
+  - glance:ceph
+- - ceph-osd:mon
+  - ceph-mon:osd
+- - ceph-radosgw:mon
+  - ceph-mon:radosgw
+- - ceph-radosgw:identity-service
+  - keystone:identity-service
+- - placement:identity-service
+  - keystone:identity-service
+- - placement:placement
+  - nova-cloud-controller:placement
+- - keystone:shared-db
+  - keystone-mysql-router:shared-db
+- - cinder:shared-db
+  - cinder-mysql-router:shared-db
+- - glance:shared-db
+  - glance-mysql-router:shared-db
+- - nova-cloud-controller:shared-db
+  - nova-mysql-router:shared-db
+- - neutron-api:shared-db
+  - neutron-mysql-router:shared-db
+- - openstack-dashboard:shared-db
+  - openstack-dashboard-mysql-router:shared-db
+- - placement:shared-db
+  - placement-mysql-router:shared-db
+- - vault:shared-db
+  - vault-mysql-router:shared-db
+- - keystone-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - cinder-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - nova-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - glance-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - neutron-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - openstack-dashboard-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - placement-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - vault-mysql-router:db-router
+  - mysql-innodb-cluster:db-router
+- - neutron-api-plugin-ovn:neutron-plugin
+  - neutron-api:neutron-plugin-api-subordinate
+- - neutron-api-hacluster:ha
+  - neutron-api:ha
+- - ovn-central:certificates
+  - vault:certificates
+- - ovn-central:ovsdb-cms
+  - neutron-api-plugin-ovn:ovsdb-cms
+- - neutron-api:certificates
+  - vault:certificates
+- - ovn-chassis:nova-compute
+  - nova-compute:neutron-plugin
+- - ovn-chassis:certificates
+  - vault:certificates
+- - ovn-chassis:ovsdb
+  - ovn-central:ovsdb
+- - vault:certificates
+  - neutron-api-plugin-ovn:certificates
+- - vault:certificates
+  - cinder:certificates
+- - vault:certificates
+  - glance:certificates
+- - vault:certificates
+  - keystone:certificates
+- - vault:certificates
+  - nova-cloud-controller:certificates
+- - vault:certificates
+  - openstack-dashboard:certificates
+- - vault:certificates
+  - placement:certificates
+- - vault:certificates
+  - ceph-radosgw:certificates
+- - vault:certificates
+  - mysql-innodb-cluster:certificates
+- - keystone-hacluster:ha
+  - keystone:ha
+- - glance-simplestreams-sync:certificates
+  - vault:certificates
+- - glance-simplestreams-sync:identity-service
+  - keystone:identity-service
+- - nova-cloud-controller-hacluster:ha
+  - nova-cloud-controller:ha
+- - nova-cloud-controller:memcache
+  - memcached:cache
+- - ceph-radosgw-hacluster:ha
+  - ceph-radosgw:ha
+- - cinder-hacluster:ha
+  - cinder:ha
+- - glance-hacluster:ha
+  - glance:ha
+- - placement-hacluster:ha
+  - placement:ha
+- - vault-hacluster:ha
+  - vault:ha

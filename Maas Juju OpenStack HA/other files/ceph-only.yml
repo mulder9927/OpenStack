@@ -1,0 +1,116 @@
+series: focal
+variables:
+  openstack-origin: &openstack-origin cloud:focal-wallaby
+  data-port: &data-port br-ex:bond0
+  worker-multiplier: &worker-multiplier 0.25
+  osd-devices: &osd-devices /dev/sdb /dev/sdc #/dev/sdd #/dev/sde /dev/sdf /dev/sdg
+  expected-osd-count: &expected-osd-count 3
+  expected-mon-count: &expected-mon-count 3
+  #spaces: internal
+
+
+
+machines:
+  '0':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '1':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '2':
+    series: focal
+    constraints: tags=Ceph-Prod
+
+
+applications:
+
+ ceph-dashboard:
+    charm: cs:~openstack-charmers/ceph-dashboard
+    channel: quincy/stable
+    # bindings:      "": internal
+    ##revision: 3
+
+ openstack-loadbalancer:
+    charm: cs:~openstack-charmers/openstack-loadbalancer
+    channel: jammy/stable
+    #revision: 0
+    num_units: 3
+    # bindings:      "": internal
+    to:
+     - lxd:0
+     - lxd:1
+     - lxd:2
+    options:
+      vip: 10.1.7.26
+
+ openstack-loadbalancer-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+
+
+  ceph-mon:
+    annotations:
+      gui-x: '790'
+      gui-y: '1540'
+    charm: ch:ceph-mon
+    channel: quincy/stable
+    #revision: 73
+    num_units: 3
+    options:
+      expected-osd-count: *expected-osd-count
+      monitor-count: *expected-mon-count
+      source: *openstack-origin
+      # bindings:
+      #   public:    #   "": internal
+     to:
+      - lxd:0
+      - lxd:1
+      - lxd:2
+
+  ceph-osd:
+    annotations:
+      gui-x: '1065'
+      gui-y: '1540'
+    charm: ch:ceph-osd
+    channel: pacific/stable
+    #revision: 513
+    num_units: 3
+    # # bindings:    #   "": internal
+    options:
+      osd-devices: *osd-devices
+      source: *openstack-origin
+    to:
+     - '0'
+     - '1'
+     - '2'
+
+  ceph-radosgw-hacluster:
+    charm: ch:hacluster
+    channel: 2.4/stable
+    #revision: 83
+    # bindings:      "": internal
+    annotations:
+      gui-x: 975.2022857666016
+      gui-y: 861.4601440429688
+
+  ceph-radosgw:
+    annotations:
+      gui-x: '850'
+      gui-y: '900'
+    charm: ch:ceph-radosgw
+    channel: pacific/stable
+    #revision: 499
+    num_units: 3
+    options:
+      os-admin-hostname: ceph.prod
+      os-internal-hostname: ceph.prod
+      os-public-hostname: ceph.prod
+      vip: 10.1.7.18
+      source: *openstack-origin
+      # # bindings:    #   "": internal
+    to:
+     - lxd:0
+     - lxd:1
+     - lxd:2

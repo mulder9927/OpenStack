@@ -1,0 +1,49 @@
+machines:
+  '0':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '1':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '2':
+    series: focal
+    constraints: tags=Ceph-Prod
+  '3':
+    series: focal
+    constraints: tags=Controller-Prod
+  '4':
+    series: focal
+    constraints: tags=Controller-Prod
+  '5':
+    series: focal
+    constraints: tags=Controller-Prod
+  '6':
+    series: focal
+    constraints: tags=Compute-Prod
+  '7':
+    series: focal
+    constraints: tags=Compute-Prod
+  '8':
+    series: focal
+    constraints: tags=Compute-Prod
+  '9':
+    series: focal
+    constraints: tags=Compute-Prod
+  '10':
+    series: focal
+    constraints: tags=Compute-Prod
+
+variables:
+
+  data-port: &data-port br-ex:bond0
+  osd-devices: &osd-devices /dev/sdb /dev/sdc
+
+applications:
+
+  ovn-chassis:
+    options:
+      bridge-interface-mappings: *data-port
+
+  ceph-osd:
+    options:
+      osd-devices: *osd-devices
